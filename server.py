@@ -1,108 +1,25 @@
 import socket
-import errno
-import sys
-import csv
-import hashlib
 
-ADDR = '127.0.0.1'
-PORT = 9090
-log_file = open('log.txt', 'w')
+udp_sock_server = socket.socket()
+udp_sock_server.bind(('', 9090))
 
-def log(*args):
-	print(*args)
-	global log_file
-	log_file.write(*args)
-	log_file.write('\n')
+udp_sock_server.listen(0)
 
-def is_port_in_use(PORT):
-	try:
-		socket.socket().bind((ADDR, PORT))
-		socket.socket().close()
-	except socket.error as e:
-		return True
-	else:
-		return False
-
-def find_user_by_ip(addr):
-	with open('users.csv') as csvfile:
-		reader = csv.DictReader(csvfile, delimiter=';')
-		for row in reader:
-			if (row['ip'] == addr):
-				return row['name']
-		return False
-
-def is_password_correct(addr, pswd):
-	with open('users.csv') as csvfile:
-		reader = csv.DictReader(csvfile, delimiter=';')
-		for row in reader:
-			if row['ip'] == addr:
-				return pswd == row['pswd']
-		return False
-
-sock = socket.socket()
-log('Запуск сервера...')
-
-request = input('Введите адрес и порт сервера.  \n'\
-                'Нажмите Enter, чтобы использовать значение по умолчанию:\n')
-if request:
-    try:
-        ADDR, PORT = request.split()
-        PORT = int(PORT)
-    except:
-        log('Введены некорректные данные!')
-        sys.exit()
-
-try:
-	while is_port_in_use(PORT):
-		print(f'Порт {PORT} занят.')
-		PORT += 1
-		print(f'Новый порт {PORT}')
-	sock.bind((ADDR, PORT))
-	log(f'Начало прослушивания порта №{PORT}...')
-	sock.listen(2)
-except socket.error as e:
-	print(e)
-	log('Невозможно запустить сервер!')
-	sys.exit()
-
-
-conn, addr = sock.accept()
-log('Подключение клиента...')
-conn.recv(1024)
-if not find_user_by_ip(addr[0]):
-	conn.send('Пожалуйста, представьтесь: '.encode())
-	name = conn.recv(1024).decode()
-	conn.send('Введите пароль: '.encode())
-	pswd = hashlib.md5(conn.recv(1024)).hexdigest()
-	with open('users.csv', 'a') as csvfile:
-		writer = csv.DictWriter(csvfile, delimiter=';', fieldnames = ['ip', 'name', 'pswd'])
-		writer.writerow({'ip': addr[0], 'name': name, 'pswd':pswd})
-
-
-conn.send(f'Добро пожаловать, {find_user_by_ip(addr[0])}!\n'.encode())
-conn.send('Введите пароль для входа: '.encode())
-pswd = hashlib.md5(conn.recv(1024)).hexdigest()
-while not is_password_correct(addr[0], pswd):
-	conn.send('Неверный пароль!'.encode())
-	pswd = hashlib.md5(conn.recv(1024)).hexdigest()
-	
-log(f'Подключен пользователь {str(addr)}')
+conn_server, addr_server = udp_sock_server.accept()
 
 msg = ''
-conn.send('Подключение установлено'.encode())
+
 while True:
-	data = conn.recv(1024)
-	log('Приём данных от клиента...')
+	data = conn_server.recv(1024)
 	if not data:
-		log('Данных нет. Прослушивание порта...')
-		conn, addr = sock.accept()
-	msg += data.decode() + '\n'
-	log('Отправка клиенту: ')
-	log(str(addr) + ' ' + data.decode())
-	conn.send(data)
+		break
+	msg += data.decode()
+	udp_sock_client = socket.socket()
+	udp_sock_client.connect(('', 9091))
 
-log(msg)
+	udp_sock_client.send(data)
+	udp_sock_client.close()
 
-conn.close()
-log('Остановка сервера.')
-log_file.close()
+print(msg)
+
+conn_server.close()
