@@ -1,40 +1,25 @@
 import socket
-import sys
 
-ADDR = '127.0.0.1'
-PORT = 9090
-sock = socket.socket()
-sock.setblocking(1)
-
-request = input('Введите адрес и порт для подключения через пробел.  \n'\
-                'Нажмите Enter, чтобы использовать значение по умолчанию:\n')
-if request:
-    try:
-        ADDR, PORT = request.split()
-        PORT = int(PORT)
-    except:
-        print('Введены некорректные данные!')
-        sys.exit()
-
-try:
-    sock.connect((ADDR, PORT))
-    print('Соединение с сервером...')
-except:
-    print('Невозможно подключиться!')
-    sys.exit()
+print(1)
+udp_sock_server = socket.socket()
+udp_sock_server.connect(('', 9090))
 
 
-msg = f'IP: {ADDR}, PORT:{PORT}'
+msg = ''
+
 while msg != 'exit':
-    sock.send(msg.encode())
-    print('Отправка данных серверу...')
+    msg = input('введите сообщение: ')
 
-    data = sock.recv(1024)
-    print('Приём данных от сервера...')
+    udp_sock_client = socket.socket()
+    udp_sock_client.bind(('', 9091))
+    udp_sock_client.listen(1)
 
-    print(data.decode() + '\n')
-    msg = input()
-    msg = '<пустое сообщение>' if not msg else msg
+    udp_sock_server.send(msg.encode())
 
-sock.close()
-print('Разрыв соединения с сервером.')
+    conn_client, addr_client = udp_sock_client.accept()
+    data = conn_client.recv(1024)
+    conn_client.close()
+    print(data.decode())
+
+
+
